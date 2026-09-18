@@ -15,11 +15,12 @@ class Users(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.now)
 
+
 class Couriers(Base):
     __tablename__ = "couriers"
 
     id = Column(Integer, primary_key=True, index=True)
-    Customer_id = Column(Integer, ForeignKey('users.id'),nullable=False)
+    customer_id = Column(Integer, ForeignKey('users.id'),nullable=False)
     sending_from = Column(String)
     destination = Column(String)
     receiver_name = Column(String, nullable=False)
