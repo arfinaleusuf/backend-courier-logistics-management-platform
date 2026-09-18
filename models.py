@@ -13,6 +13,7 @@ class Users(Base):
     hash_password = Column(String)
     role = Column(String)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.now)
 
 class Couriers(Base):
     __tablename__ = "couriers"
@@ -21,8 +22,19 @@ class Couriers(Base):
     Customer_id = Column(Integer, ForeignKey('users.id'),nullable=False)
     sending_from = Column(String)
     destination = Column(String)
-    weight = Column(Integer)
-    Bill = Column(Integer)
+    receiver_name = Column(String, nullable=False)
+    weight = Column(Float, nullable=False)
+    bill = Column(Float)
     is_aproved = Column(Boolean, default=False)
-    assigned_rider = Column(Integer, ForeignKey("users.id"))
+    assigned_rider = Column(Integer, ForeignKey("users.id"),nullable=True, default=None)
     is_completed = Column(Boolean, default=False)
+
+class PasswordResetOtp(Base):
+    __tablename__ = "password_reset_otp"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    otp = Column(String,nullable=False)
+    expires_at = Column(DateTime)
+    is_used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
