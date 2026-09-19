@@ -18,6 +18,18 @@ OAuth2_bearer = OAuth2PasswordBearer(tokenUrl='login')
 SECRET_KEY = '6a1c71aa7ffc910afb747733a5be5ec7ecba014ee944ec281d956b7103f58a26'
 AGORITHM = 'HS256'
 
+class CreateUsers(BaseModel):
+    email: str
+    username: str
+    firstname: str
+    lastname: str
+    password: str
+    role: Literal["admin", "customer", "rider"]
+
+class UpdatePassword(BaseModel):
+    current_password: str
+    new_password : str
+
 
 def authenticate_user(username, password, db):
         user = db.query(Users).filter(Users.username == username).first()
@@ -47,13 +59,6 @@ def get_current_user(token: Annotated[str, Depends(OAuth2_bearer)]):
     except:
         raise HTTPException(status_code=404, detail='User not Found')
 
-class CreateUsers(BaseModel):
-    email: str
-    username: str
-    firstname: str
-    lastname: str
-    password: str
-    role: Literal["admin", "customer", "rider"]
 
 def get_db():
     db = SessionLocal()
@@ -63,6 +68,8 @@ def get_db():
         db.close()
 
 db_dependency = Annotated[Session, Depends(get_db)]
+user_dependency = Annotated[dict, Depends(get_current_user)]
+
 
 @router.post('/createuser')
 def createuser(db: db_dependency, new_user: CreateUsers):
@@ -78,8 +85,7 @@ def createuser(db: db_dependency, new_user: CreateUsers):
     db.add(user_model)
     db.commit()
 
-    return JSONResponse(status_code=201, content={'message': 'User added Successfully'})
-
+    return JSONResponse(status_code=201, content={'messege': 'User added Successfully'})
 
 @router.post('/login')
 def login_user(db : db_dependency, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
@@ -87,7 +93,24 @@ def login_user(db : db_dependency, form_data: Annotated[OAuth2PasswordRequestFor
     user = authenticate_user(form_data.username, form_data.password, db)
 
     if not user:
-        return "Faild authentication"
-
+       raise HTTPException(status_code=401, detail='Failed Authentication')
+           
     token = create_access_token(user.username, user.id, user.role,timedelta(minutes=30))
     return {'access_token': token, 'token_type': 'bearer'}
+
+@router.put('/passwordChange')
+def update_password(user : user_dependency, db : db_dependency, update_password : UpdatePassword):
+    if user is None:
+        raise HTTPException(status_code=401, detail='Failed Authentication')
+    
+    user = db.query(Users).filter(Users.id == user.get("id")).first()
+
+    if not bcrypt_context.verify(update_password.current_password, user.hash_password):
+        raise HTTPException(status_code=401, detail='Worng Password')
+
+    user.hash_password = bcrypt_context.hash(update_password.new_password)
+
+    db.add(user)
+    db.commit()
+
+    return JSONResponse(status_code=200, content={'messege': 'Password updated sucessfully'})

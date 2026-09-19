@@ -6,12 +6,12 @@ from pydantic import BaseModel,Field
 from models import Users, Couriers, PasswordResetOtp
 from database import SessionLocal, engine
 from fastapi.responses import JSONResponse
-from router import admin, auth
+from router import admin, auth,rider
 from router.auth import get_current_user
 from fastapi.middleware.cors import CORSMiddleware
 
-
 app = FastAPI()
+
 
 origins = ["*"]
 
@@ -49,7 +49,7 @@ def get_my_all_couriers(user: user_dependency, db: db_dependency):
     if user is None:
         raise HTTPException(status_code=401, detail='Failed Authentication')
     couriers = db.query(Couriers).filter(Couriers.customer_id == user.id).all()
-    if couriers is None:
+    if not couriers:
         raise HTTPException(status_code=404, detail='No Couriers found')
     return couriers
 
@@ -68,3 +68,21 @@ def create_new_courier(user: user_dependency, db: db_dependency, new_courier : C
     db.add(courier_model)
     db.commit()
     return JSONResponse(status_code=201, content={'message':'Courier Added Successfully'})
+
+@app.get('/user')
+def get_user_details(user: user_dependency, db: db_dependency):
+    if user is None:
+        raise HTTPException(status_code=401, detail='Failed Authentication')
+    current_user = db.query(Users).filter(Users.id == user.get('id')).first()
+    if current_user is None:
+        raise HTTPException(status_code=404, detail='User not found')
+    return {
+        'id': current_user.id,
+        'email': current_user.email,
+        'username': current_user.username,
+        'firstname': current_user.firstname,
+        'lastname': current_user.lastname,
+        'role': current_user.role,
+        'is_active': current_user.is_active,
+        'created_at': current_user.created_at
+    }
