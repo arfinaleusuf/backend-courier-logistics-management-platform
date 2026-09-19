@@ -29,6 +29,8 @@ class Couriers(Base):
     is_aproved = Column(Boolean, default=False)
     assigned_rider = Column(Integer, ForeignKey("users.id"),nullable=True, default=None)
     is_completed = Column(Boolean, default=False)
+    status = Column(String, default='pending')
+    created_at = Column(DateTime, default=datetime.now)
 
 class PasswordResetOtp(Base):
     __tablename__ = "password_reset_otp"

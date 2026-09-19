@@ -1,11 +1,11 @@
 from fastapi import FastAPI, APIRouter,Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime, timezone
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from models import Users
 from fastapi.responses import JSONResponse
 from passlib.context import CryptContext
-from typing import Annotated,Literal
+from typing import Annotated,Literal,Optional
 from database import SessionLocal
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt,JWTError
@@ -25,6 +25,12 @@ class CreateUsers(BaseModel):
     lastname: str
     password: str
     role: Literal["admin", "customer", "rider"]
+
+class UpdateUser(BaseModel):
+    email : Optional[str] = Field(default=None)
+    username : Optional[str] = Field(default=None)
+    firstname : Optional[str] = Field(default=None)
+    lastname : Optional[str]= Field(default=None)
 
 class UpdatePassword(BaseModel):
     current_password: str
@@ -114,3 +120,19 @@ def update_password(user : user_dependency, db : db_dependency, update_password 
     db.commit()
 
     return JSONResponse(status_code=200, content={'messege': 'Password updated sucessfully'})
+
+@router.put('/edituser')
+def update_user(user: user_dependency, db : db_dependency, update_user : UpdateUser):
+
+    if user is None: 
+        raise HTTPException(status_code=401, detail='Failed Authentication')
+    
+    user = db.query(Users).filter(Users.id == user.get('id')).first()
+    
+    update_data = update_user.model_dump(exclude_unset=True)
+
+    for key,value in update_data.items():
+        setattr(user,key,value)
+    
+    db.commit()
+    return JSONResponse(status_code=200, content={'message' : 'User updated successfully'})
