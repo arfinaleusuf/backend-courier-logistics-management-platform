@@ -38,6 +38,6 @@ class PasswordResetOtp(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     otp = Column(String,nullable=False)
-    expires_at = Column(DateTime)
+    expires_at = Column(DateTime,nullable=False)
     is_used = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)

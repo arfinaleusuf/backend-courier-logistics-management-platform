@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from router import admin, auth,rider
 from router.auth import get_current_user
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
 
 app = FastAPI()
 

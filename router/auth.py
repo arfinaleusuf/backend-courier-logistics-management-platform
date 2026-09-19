@@ -2,13 +2,17 @@ from fastapi import FastAPI, APIRouter,Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime, timezone
 from pydantic import BaseModel, Field
-from models import Users
+from models import Users, PasswordResetOtp
 from fastapi.responses import JSONResponse
 from passlib.context import CryptContext
 from typing import Annotated,Literal,Optional
 from database import SessionLocal
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt,JWTError
+import random
+import smtplib
+from email.message import EmailMessage
+import os
 
 router = APIRouter()
 
@@ -136,3 +140,125 @@ def update_user(user: user_dependency, db : db_dependency, update_user : UpdateU
     
     db.commit()
     return JSONResponse(status_code=200, content={'message' : 'User updated successfully'})
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    otp: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+def send_otp_email(receiver_email: str, otp: str):
+
+    msg = EmailMessage()
+
+    msg["Subject"] = "Courier App - Password Reset OTP"
+    msg["From"] = os.getenv("EMAIL_ADDRESS")
+    msg["To"] = receiver_email
+
+    msg.set_content(
+        f"""
+Your password reset OTP is: {otp}
+
+This OTP will expire in 5 minutes.
+
+If you did not request a password reset, please ignore this email.
+"""
+    )
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+
+        server.login(
+            os.getenv("EMAIL_ADDRESS"),
+            os.getenv("EMAIL_PASSWORD")
+        )
+
+        server.send_message(msg)
+
+@router.post('/forgot-password')
+def forgot_password(request: ForgotPasswordRequest,db: db_dependency):
+    user = db.query(Users).filter(Users.email == request.email).first()
+
+    if user is None:
+        raise HTTPException(status_code=404,detail="User not found")
+
+    otp = str(random.randint(100000, 999999))
+
+    hashed_otp = bcrypt_context.hash(otp)
+
+    reset_otp = PasswordResetOtp(user_id=user.id,otp=hashed_otp,expires_at=datetime.now() + timedelta(minutes=5),is_used=False)
+
+    send_otp_email(user.email, otp)
+
+    db.add(reset_otp)
+    db.commit()
+
+    return {
+        "message": "OTP sent successfully"
+    }
+
+@router.post('/verify-otp')
+def verify_otp(request: VerifyOtpRequest,db: db_dependency):
+    user = db.query(Users).filter(Users.email == request.email).first()
+
+    if user is None:
+        raise HTTPException(status_code=404,detail="User not found")
+
+    reset_data = (db.query(PasswordResetOtp)
+        .filter(
+            PasswordResetOtp.user_id == user.id,
+            PasswordResetOtp.is_used == False
+        )
+        .order_by(PasswordResetOtp.id.desc())
+        .first()
+    )
+
+    if reset_data is None:
+        raise HTTPException(status_code=400,detail="OTP not found")
+
+    if reset_data.expires_at < datetime.now():
+        raise HTTPException(status_code=400,detail="OTP expired")
+
+    if not bcrypt_context.verify(request.otp,reset_data.otp):
+        raise HTTPException(status_code=400,detail="Invalid OTP")
+
+    return {"message": "OTP verified successfully","reset_id": reset_data.id}
+
+
+
+@router.post('/reset-password')
+def reset_password(request: ResetPasswordRequest,db: db_dependency):
+    user = db.query(Users).filter(Users.email == request.email).first()
+
+    if user is None:
+       raise HTTPException(status_code=404,detail="User not found")
+
+    reset_data = (
+        db.query(PasswordResetOtp).filter(PasswordResetOtp.user_id == user.id,PasswordResetOtp.is_used == False)
+        .order_by(PasswordResetOtp.id.desc()).first()
+        )
+
+    if reset_data is None:
+        raise HTTPException(status_code=400,detail="OTP not found")
+
+    if reset_data.expires_at < datetime.now():
+        raise HTTPException(status_code=400,detail="OTP expired")
+
+    if not bcrypt_context.verify(request.otp,reset_data.otp):
+        raise HTTPException(status_code=400,detail="Invalid OTP")
+
+    user.hash_password = bcrypt_context.hash(request.new_password)
+
+    reset_data.is_used = True
+
+    db.commit()
+
+    return {
+        "message": "Password reset successfully"
+    }
