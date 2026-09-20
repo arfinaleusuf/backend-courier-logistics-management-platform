@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 from typing import Annotated
 from database import SessionLocal
 from router.auth import get_current_user
+from datetime import date, datetime, time
+from fastapi import Query
 
 router = APIRouter()
 
@@ -100,9 +102,6 @@ def view_all_rider(user:user_dependency, db: db_dependency):
         for rider in riders
     ]
 
-from datetime import date, datetime, time
-from fastapi import Query
-
 
 @router.get('/admin/filter_courier')
 def filter_courier(
@@ -114,12 +113,8 @@ def filter_courier(
 ):
 
     if user is None or user.get('role') != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Failed Authentication"
-        )
+        raise HTTPException(status_code=403,detail="Failed Authentication")
 
-    # Valid status
     valid_status = [
         "pending",
         "approved",
@@ -133,38 +128,19 @@ def filter_courier(
             detail=f"Invalid status. Select from {valid_status}"
         )
 
-    # Date validation
     if from_date and to_date and from_date > to_date:
-        raise HTTPException(
-            status_code=400,
-            detail="from_date cannot be greater than to_date"
-        )
+        raise HTTPException(status_code=400,detail="from_date cannot be greater than to_date")
 
     query = db.query(Couriers)
 
-    # Status filter
     if status:
-        query = query.filter(
-            Couriers.status == status
-        )
+        query = query.filter(Couriers.status == status)
 
-    # From date
     if from_date:
-        query = query.filter(
-            Couriers.created_at >= datetime.combine(
-                from_date,
-                time.min
-            )
-        )
+        query = query.filter(Couriers.created_at >= datetime.combine(from_date,time.min))
 
-    # To date
     if to_date:
-        query = query.filter(
-            Couriers.created_at <= datetime.combine(
-                to_date,
-                time.max
-            )
-        )
+        query = query.filter(Couriers.created_at <= datetime.combine(to_date,time.max))
 
     couriers = query.all()
 
