@@ -209,6 +209,31 @@ Bangladesh Courier Service.
         print("Email error:", e)
         raise HTTPException(status_code=500,detail="Failed to send OTP email")
 
+@router.get("/user")
+def get_current_user_data(
+    user: user_dependency,
+    db: db_dependency
+):
+    current_user = db.query(Users).filter(
+        Users.id == user.get("id")
+    ).first()
+
+    if current_user is None:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "username": current_user.username,
+        "firstname": current_user.firstname,
+        "lastname": current_user.lastname,
+        "role": current_user.role,
+        "is_active": current_user.is_active
+    }
+
 @router.post("/forgot-password")
 def forgot_password(request: ForgotPasswordRequest,db: db_dependency):
 
