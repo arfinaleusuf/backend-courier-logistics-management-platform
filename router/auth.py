@@ -91,7 +91,7 @@ def authenticate_user(username, password, db):
 
 def create_access_token(username: str, user_id: int, role: str, expires_delta : timedelta):
     encode = {'sub':username, 'id': user_id, 'role': role}
-    expires = datetime.now(timezone.utc) + expires_delta
+    expires = datetime.now() + expires_delta
     encode.update({'exp': expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -171,14 +171,12 @@ def update_user(user: user_dependency,db: db_dependency,update_user: UpdateUser)
     }
 
 
-def send_otp_email(receiver_email: str,otp: str):
-    msg = EmailMessage()
-    msg["Subject"] = "Courier App - Password Reset OTP"
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = receiver_email
-    msg.set_content(
-        f"""
-Hello,
+def send_otp_email(receiver_email: str, otp: str):
+  msg = EmailMessage()
+  msg["Subject"] = "Courier App - Password Reset OTP"
+  msg["From"] = EMAIL_ADDRESS
+  msg["To"] = receiver_email
+  msg.set_content(f"""Hello,
 
 Your Courier App password reset OTP is:
 
@@ -186,28 +184,29 @@ Your Courier App password reset OTP is:
 
 This OTP will expire in 5 minutes.
 
-If you did not request a password reset,
-please ignore this email.
+If you did not request a password reset, please ignore this email.
 
 Thank you.
 Bangladesh Courier Service.
-"""
+""")
+
+  try:
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15) as server:
+      server.ehlo()
+      server.starttls()
+      server.ehlo()
+      server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+      server.send_message(msg)
+  except smtplib.SMTPAuthenticationError:
+    raise HTTPException(
+        status_code=500,
+        detail="Gmail authentication failed. Check your App Password.",
     )
-
-    try:
-        with smtplib.SMTP(SMTP_SERVER,SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(EMAIL_ADDRESS,EMAIL_PASSWORD)
-            server.send_message(msg)
-
-    except smtplib.SMTPAuthenticationError:
-        raise HTTPException(status_code=500,detail="Gmail authentication failed. Check your App Password.")
-
-    except Exception as e:
-        print("Email error:", e)
-        raise HTTPException(status_code=500,detail="Failed to send OTP email")
+  except Exception as e:
+    print("Email error:", e)
+    raise HTTPException(
+        status_code=500, detail=f"Failed to send OTP email: {str(e)}"
+    ) from e
 
 @router.get("/user")
 def get_current_user_data(
