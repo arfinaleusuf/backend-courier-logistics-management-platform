@@ -10,9 +10,9 @@ from database import SessionLocal
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt
 
-import random
-import smtplib
-from email.message import EmailMessage
+import os
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 
 router = APIRouter()
 
@@ -27,10 +27,14 @@ OAuth2_bearer = OAuth2PasswordBearer(tokenUrl="login")
 SECRET_KEY = "YOUR_SECRET_KEY_HERE"
 ALGORITHM = "HS256"
 
-EMAIL_ADDRESS = "arfinaleusuf@gmail.com"
-EMAIL_PASSWORD = "ujxjimlgbtvdjexi"
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+configuration = sib_api_v3_sdk.Configuration()
+configuration.api_key['api-key'] = (
+    "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"
+)
+
+api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+    sib_api_v3_sdk.ApiClient(configuration)
+)
 
 
 class CreateUsers(BaseModel):
@@ -172,40 +176,36 @@ def update_user(user: user_dependency,db: db_dependency,update_user: UpdateUser)
 
 
 def send_otp_email(receiver_email: str, otp: str):
-  msg = EmailMessage()
-  msg["Subject"] = "Courier App - Password Reset OTP"
-  msg["From"] = EMAIL_ADDRESS
-  msg["To"] = receiver_email
-  msg.set_content(f"""Hello,
+  sender = {"name": "Bangladesh Courier Service", "email": "arfinaleusuf@gmail.com"}
+  to = [{"email": receiver_email}]
 
-Your Courier App password reset OTP is:
+  html_content = f"""
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2>Courier App - Password Reset</h2>
+        <p>Hello,</p>
+        <p>Your password reset OTP is:</p>
+        <h1 style="color: #2563eb; letter-spacing: 2px;">{otp}</h1>
+        <p>This OTP will expire in <strong>5 minutes</strong>.</p>
+        <p>If you did not request a password reset, please ignore this email.</p>
+        <br>
+        <p>Thank you,<br><strong>Bangladesh Courier Service</strong></p>
+    </div>
+    """
 
-{otp}
-
-This OTP will expire in 5 minutes.
-
-If you did not request a password reset, please ignore this email.
-
-Thank you.
-Bangladesh Courier Service.
-""")
+  send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+      to=to,
+      html_content=html_content,
+      sender=sender,
+      subject="Courier App - Password Reset OTP",
+  )
 
   try:
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15) as server:
-      server.ehlo()
-      server.starttls()
-      server.ehlo()
-      server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-      server.send_message(msg)
-  except smtplib.SMTPAuthenticationError:
+    api_response = api_instance.send_transac_email(send_smtp_email)
+    return api_response
+  except ApiException as e:
+    print("Brevo API Error:", e)
     raise HTTPException(
-        status_code=500,
-        detail="Gmail authentication failed. Check your App Password.",
-    )
-  except Exception as e:
-    print("Email error:", e)
-    raise HTTPException(
-        status_code=500, detail=f"Failed to send OTP email: {str(e)}"
+        status_code=500, detail="Failed to send OTP email via Brevo"
     ) from e
 
 @router.get("/user")

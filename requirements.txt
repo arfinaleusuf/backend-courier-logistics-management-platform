@@ -15,3 +15,6 @@ jinja2
 httpx
 pytest
 pytest-asyncio
+resend
+brevo-python
+sib-api-v3-sdk
