@@ -109,7 +109,11 @@ def filter_courier(
     db: db_dependency,
     status: str | None = Query(default=None),
     from_date: date | None = Query(default=None),
-    to_date: date | None = Query(default=None)
+    to_date: date | None = Query(default=None),
+    sort_by: str = Query(
+        default="newest",
+        description="Select newest, oldest, bill_asc or bill_desc"
+    )
 ):
 
     if user is None or user.get('role') != "admin":
@@ -122,11 +126,18 @@ def filter_courier(
         "completed"
     ]
 
+    valid_sort = [
+        "newest",
+        "oldest",
+        "bill_asc",
+        "bill_desc"
+    ]
+
     if status is not None and status not in valid_status:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid status. Select from {valid_status}"
-        )
+        raise HTTPException(status_code=400,detail=f"Invalid status. Select from {valid_status}")
+
+    if sort_by not in valid_sort:
+        raise HTTPException(status_code=400,detail=f"Invalid sort_by. Select from {valid_sort}")
 
     if from_date and to_date and from_date > to_date:
         raise HTTPException(status_code=400,detail="from_date cannot be greater than to_date")
@@ -140,14 +151,23 @@ def filter_courier(
         query = query.filter(Couriers.created_at >= datetime.combine(from_date,time.min))
 
     if to_date:
-        query = query.filter(Couriers.created_at <= datetime.combine(to_date,time.max))
+        query = query.filter(
+            Couriers.created_at <= datetime.combine(to_date,time.max))
+
+    if sort_by == "newest":
+        query = query.order_by(Couriers.created_at.desc())
+
+    elif sort_by == "oldest":
+        query = query.order_by(Couriers.created_at.asc())
+
+    elif sort_by == "bill_asc":
+        query = query.order_by(Couriers.bill.asc())
+
+    elif sort_by == "bill_desc":
+        query = query.order_by(Couriers.bill.desc())
 
     couriers = query.all()
-
-    return {
-        "total": len(couriers),
-        "couriers": couriers
-    }
+    return {"total": len(couriers),"couriers": couriers}
 
 @router.get('/admin/all_customer')
 def view_all_customer(user:user_dependency, db: db_dependency):
