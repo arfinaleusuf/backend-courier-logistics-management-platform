@@ -9,10 +9,15 @@ from typing import Annotated, Literal, Optional
 from database import SessionLocal
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt
-
+import random
+from dotenv import load_dotenv
 import os
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+load_dotenv()
+
 
 router = APIRouter()
 
@@ -26,15 +31,6 @@ OAuth2_bearer = OAuth2PasswordBearer(tokenUrl="login")
 
 SECRET_KEY = "YOUR_SECRET_KEY_HERE"
 ALGORITHM = "HS256"
-
-configuration = sib_api_v3_sdk.Configuration()
-configuration.api_key['api-key'] = (
-    "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"
-)
-
-api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
-    sib_api_v3_sdk.ApiClient(configuration)
-)
 
 
 class CreateUsers(BaseModel):
@@ -174,40 +170,6 @@ def update_user(user: user_dependency,db: db_dependency,update_user: UpdateUser)
         "message": "User updated successfully"
     }
 
-
-def send_otp_email(receiver_email: str, otp: str):
-  sender = {"name": "Bangladesh Courier Service", "email": "arfinaleusuf@gmail.com"}
-  to = [{"email": receiver_email}]
-
-  html_content = f"""
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2>Courier App - Password Reset</h2>
-        <p>Hello,</p>
-        <p>Your password reset OTP is:</p>
-        <h1 style="color: #2563eb; letter-spacing: 2px;">{otp}</h1>
-        <p>This OTP will expire in <strong>5 minutes</strong>.</p>
-        <p>If you did not request a password reset, please ignore this email.</p>
-        <br>
-        <p>Thank you,<br><strong>Bangladesh Courier Service</strong></p>
-    </div>
-    """
-
-  send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-      to=to,
-      html_content=html_content,
-      sender=sender,
-      subject="Courier App - Password Reset OTP",
-  )
-
-  try:
-    api_response = api_instance.send_transac_email(send_smtp_email)
-    return api_response
-  except ApiException as e:
-    print("Brevo API Error:", e)
-    raise HTTPException(
-        status_code=500, detail="Failed to send OTP email via Brevo"
-    ) from e
-
 @router.get("/user")
 def get_current_user_data(
     user: user_dependency,
@@ -232,6 +194,58 @@ def get_current_user_data(
         "role": current_user.role,
         "is_active": current_user.is_active
     }
+
+
+def send_otp_email(receiver_email: str, otp: str):
+
+    sender_email  = os.getenv("SENDER_EMAIL",  "arfinaleusuf@gmail.com")
+    sender_name   = os.getenv("SENDER_NAME",   "Bangladesh Courier Service")
+    smtp_host     = os.getenv("SMTP_HOST",     "smtp.gmail.com")
+    smtp_port     = int(os.getenv("SMTP_PORT", 587))
+    smtp_login    = os.getenv("SMTP_LOGIN",    sender_email)
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2>Courier App - Password Reset</h2>
+        <p>Hello,</p>
+        <p>Your password reset OTP is:</p>
+        <h1 style="color: #2563eb; letter-spacing: 2px;">
+            {otp}
+        </h1>
+        <p>
+            This OTP will expire in <strong>5 minutes</strong>.
+        </p>
+        <p>
+            If you did not request a password reset, please ignore this email.
+        </p>
+        <br>
+        <p>
+            Thank you,<br>
+            <strong>Bangladesh Courier Service</strong>
+        </p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Courier App - Password Reset OTP"
+    msg["From"]    = f"{sender_name} <{sender_email}>"
+    msg["To"]      = receiver_email
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_login, smtp_password)
+            server.sendmail(sender_email, receiver_email, msg.as_string())
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Email sending failed: {str(e)}"
+        )
+
+    
 
 @router.post("/forgot-password")
 def forgot_password(request: ForgotPasswordRequest,db: db_dependency):
