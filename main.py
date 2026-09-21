@@ -89,28 +89,8 @@ def get_user_details(user: user_dependency, db: db_dependency):
         'created_at': current_user.created_at
     }
 
-@app.get('/courier/view/{courier_id}')
-def view_specific_courier(user: user_dependency, db: db_dependency, courier_id:int):
-    if user is None:
-        raise HTTPException(status_code=401, detail='Failed Authentication')
-    courier = db.query(Couriers).filter(Couriers.customer_id == user.get('id')).filter(Couriers.id == courier_id).first()
-    if courier is None:
-        raise HTTPException(status_code=404, detail='Courier not found')
-    return {
-        'id': courier.id,
-        'customer_id': courier.customer_id,
-        'sending_from': courier.sending_from,
-        'destination': courier.destination,
-        'receiver_name': courier.receiver_name,
-        'weight': courier.weight,
-        'bill': courier.bill,
-        'is_aproved': courier.is_aproved,
-        'assigned_rider': courier.assigned_rider,
-        'is_completed': courier.is_completed
-        }
 
-
-@app.delete('courier/cancel/{courier_id}')
+@app.delete('/courier/cancel/{courier_id}')
 def cancel_courier(user: user_dependency, db: db_dependency, courier_id: int):
     if user is None:
         raise HTTPException(status_code=401, detail='Failed Authentication')
