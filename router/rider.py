@@ -41,3 +41,30 @@ def complete_courier(user: user_dependency,db: db_dependency,order_id: int):
     db.commit()
 
     return JSONResponse(status_code=200,content={"message": "Courier completed successfully"})
+
+@router.get('/rider/all_orders')
+def view_all_order(
+    user: user_dependency,
+    db: db_dependency
+):
+    if user is None or user.get('role') != "rider":
+        raise HTTPException(status_code=403,detail="Failed Authentication")
+
+    orders = db.query(Couriers).filter(Couriers.assigned_rider == user.get("id")).all()
+
+    return [
+        {
+            "id": order.id,
+            "customer_id": order.customer_id,
+            "sending_from": order.sending_from,
+            "destination": order.destination,
+            "receiver_name": order.receiver_name,
+            "weight": order.weight,
+            "bill": order.bill,
+            "is_aproved": order.is_aproved,
+            "assigned_rider": order.assigned_rider,
+            "is_completed": order.is_completed,
+            "status": order.status
+        }
+        for order in orders
+    ]
