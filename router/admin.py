@@ -169,25 +169,6 @@ def filter_courier(
     couriers = query.all()
     return {"total": len(couriers),"couriers": couriers}
 
-@router.get('/admin/all_customer')
-def view_all_customer(user:user_dependency, db: db_dependency):
-    if user is None or user.get('role') != "admin":
-        raise HTTPException(status_code=403, detail="Failed Authentication")
-    customers = db.query(Users).filter(Users.role == "customer").all()  
-    return [
-        {
-            "id": customer.id,
-            "username": customer.username,
-            "email": customer.email,
-            "firstname": customer.firstname,
-            "lastname": customer.lastname,
-            "role": customer.role,
-            "created_at": customer.created_at,
-            "is_active": customer.is_active
-        }
-        for customer in customers
-    ]
-
 @router.get('/admin/search_customer/{name}')
 def search_customer(
     user: user_dependency,
