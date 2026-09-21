@@ -200,9 +200,9 @@ def send_otp_email(receiver_email: str, otp: str):
 
     sender_email  = os.getenv("SENDER_EMAIL",  "arfinaleusuf@gmail.com")
     sender_name   = os.getenv("SENDER_NAME",   "Bangladesh Courier Service")
-    smtp_host     = os.getenv("SMTP_HOST",     "smtp.gmail.com")
+    smtp_host     = os.getenv("SMTP_HOST",     "smtp.sender.net")
     smtp_port     = int(os.getenv("SMTP_PORT", 587))
-    smtp_login    = os.getenv("SMTP_LOGIN",    sender_email)
+    smtp_login    = os.getenv("SMTP_LOGIN",    "")
     smtp_password = os.getenv("SMTP_PASSWORD", "")
 
     html_content = f"""
