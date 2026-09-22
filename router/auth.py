@@ -11,8 +11,9 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt
 import random
 from dotenv import load_dotenv
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+# from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 import os
+import resend
 # import smtplib
 # from email.mime.multipart import MIMEMultipart
 # from email.mime.text import MIMEText
@@ -22,16 +23,7 @@ load_dotenv()
 
 router = APIRouter()
 
-mail_conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
-    MAIL_FROM=os.getenv("MAIL_FROM"),
-    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
-    MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
-    MAIL_STARTTLS=os.getenv("MAIL_STARTTLS", "True").lower() == "true",
-    MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS", "False").lower() == "true",
-    USE_CREDENTIALS=True
-)
+resend.api_key = os.getenv("RESEND_API_KEY")
 
 bcrypt_context = CryptContext(
     schemes=["bcrypt"],
@@ -254,22 +246,20 @@ async def send_otp_email(receiver_email: str, otp: str):
     </div>
     """
 
-    message = MessageSchema(
-        subject="Courier App - Password Reset OTP",
-        recipients=[receiver_email],
-        body=html_content,
-        subtype="html"
-    )
-
     try:
-        fm = FastMail(mail_conf)
-        await fm.send_message(message)
+        params = {
+            "from": "onboarding@resend.dev",
+            "to": [receiver_email],
+            "subject": "Courier App - Password Reset OTP",
+            "html": html_content
+        }
+        resend.Emails.send(params)
 
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Email sending failed: {str(e)}"
-        )
+        status_code=500,
+        detail=f"Email sending failed: {str(e)}"
+    )
 
     
 
