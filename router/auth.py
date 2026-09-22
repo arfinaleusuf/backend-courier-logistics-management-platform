@@ -11,15 +11,27 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt
 import random
 from dotenv import load_dotenv
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+# import smtplib
+# from email.mime.multipart import MIMEMultipart
+# from email.mime.text import MIMEText
 
 load_dotenv()
 
 
 router = APIRouter()
+
+mail_conf = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+    MAIL_FROM=os.getenv("MAIL_FROM"),
+    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
+    MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
+    MAIL_STARTTLS=os.getenv("MAIL_STARTTLS", "True").lower() == "true",
+    MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS", "False").lower() == "true",
+    USE_CREDENTIALS=True
+)
 
 bcrypt_context = CryptContext(
     schemes=["bcrypt"],
@@ -196,49 +208,63 @@ def get_current_user_data(
     }
 
 
-def send_otp_email(receiver_email: str, otp: str):
-
-    sender_email  = os.getenv("SENDER_EMAIL",  "arfinaleusuf@gmail.com")
-    sender_name   = os.getenv("SENDER_NAME",   "Bangladesh Courier Service")
-    smtp_host     = os.getenv("SMTP_HOST",     "smtp.sender.net")
-    smtp_port     = int(os.getenv("SMTP_PORT", 587))
-    smtp_login    = os.getenv("SMTP_LOGIN",    "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
+async def send_otp_email(receiver_email: str, otp: str):
 
     html_content = f"""
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2>Courier App - Password Reset</h2>
+    <div style="
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: auto;
+        padding: 20px;
+    ">
+
+        <h2 style="color: #2563eb;">
+            Courier App - Password Reset
+        </h2>
+
         <p>Hello,</p>
+
         <p>Your password reset OTP is:</p>
-        <h1 style="color: #2563eb; letter-spacing: 2px;">
+
+        <h1 style="
+            color: #2563eb;
+            letter-spacing: 6px;
+        ">
             {otp}
         </h1>
+
         <p>
             This OTP will expire in <strong>5 minutes</strong>.
         </p>
+
         <p>
-            If you did not request a password reset, please ignore this email.
+            If you did not request a password reset,
+            please ignore this email.
         </p>
+
         <br>
+
         <p>
             Thank you,<br>
             <strong>Bangladesh Courier Service</strong>
         </p>
+
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Courier App - Password Reset OTP"
-    msg["From"]    = f"{sender_name} <{sender_email}>"
-    msg["To"]      = receiver_email
-    msg.attach(MIMEText(html_content, "html"))
+    message = MessageSchema(
+        subject="Courier App - Password Reset OTP",
+        recipients=[receiver_email],
+        body=html_content,
+        subtype="html"
+    )
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(smtp_login, smtp_password)
-            server.sendmail(sender_email, receiver_email, msg.as_string())
+        fm = FastMail(mail_conf)
+        await fm.send_message(message)
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -248,7 +274,7 @@ def send_otp_email(receiver_email: str, otp: str):
     
 
 @router.post("/forgot-password")
-def forgot_password(request: ForgotPasswordRequest,db: db_dependency):
+async def forgot_password(request: ForgotPasswordRequest,db: db_dependency):
 
     user = db.query(Users).filter(Users.email == request.email).first()
 
@@ -264,7 +290,7 @@ def forgot_password(request: ForgotPasswordRequest,db: db_dependency):
         is_used = False
     )
 
-    send_otp_email(user.email,otp)
+    await send_otp_email(user.email, otp)
 
     db.add(reset_otp)
 
